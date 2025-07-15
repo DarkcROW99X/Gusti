@@ -66,7 +66,7 @@ def start(update: Update, context: CallbackContext):
         "/recommend movies"
     )
 
-        update.message.reply_text(msg)
+    update.message.reply_text(msg)
 
 def set_preference(update: Update, context: CallbackContext):
     user_id = str(update.effective_user.id)

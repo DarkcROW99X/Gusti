@@ -6,8 +6,6 @@ import requests
 import base64
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
-import spotipy
-from spotipy.oauth2 import SpotifyClientCredentials
 from dotenv import load_dotenv
 
 # === Dummy web server per Render ===

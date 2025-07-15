@@ -145,6 +145,27 @@ def list_preferences(update: Update, context: CallbackContext):
     except Exception as e:
         update.message.reply_text(f"Errore nella visualizzazione delle preferenze:\n{str(e)}")
 
+def remove_preference(update: Update, context: CallbackContext):
+    user_id = str(update.effective_user.id)
+    query = " ".join(context.args).strip()
+
+    if not query:
+        update.message.reply_text("❗ Usa: /remove <titolo/artista/film>")
+        return
+
+    data = load_data()
+
+    if user_id not in data or query not in data[user_id]:
+        update.message.reply_text("⚠️ Preferenza non trovata.")
+        return
+
+    data[user_id].remove(query)
+    save_data(data)
+    update.message.reply_text(
+        f"🗑️ Preferenza rimossa: *{escape_markdown_v2(query)}*",
+        parse_mode="MarkdownV2"
+    )
+
 
 
 def recommend(update: Update, context: CallbackContext):

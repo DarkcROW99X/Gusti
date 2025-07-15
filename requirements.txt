@@ -1,2 +1,3 @@
 python-telegram-bot==13.15
-spotipy==2.22.1
+requests>=2.25.1
+python-dotenv>=0.20.0

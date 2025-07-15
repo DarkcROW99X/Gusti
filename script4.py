@@ -8,6 +8,7 @@ from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
+from dotenv import load_dotenv
 
 # === Dummy web server per Render ===
 class DummyHandler(BaseHTTPRequestHandler):
@@ -24,177 +25,105 @@ def run_dummy_server():
 # Avvia il server in un thread separato
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
-# === Configurazione Bot Telegram + Spotify ===
+load_dotenv()
+
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
-SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
-TOKEN_GITHUB = os.getenv("TOKEN_GITHUB")
-REPO_GITHUB = os.getenv("REPO_GITHUB")  # es: username/repo
-FILE_PATH_GITHUB = os.getenv("FILE_PATH_GITHUB")
-BRANCH_GITHUB = os.getenv("BRANCH_GITHUB")
+TASTEDIVE_API_KEY = os.getenv("TASTEDIVE_API_KEY")
 
-client_credentials_manager = SpotifyClientCredentials(
-    client_id=SPOTIFY_CLIENT_ID,
-    client_secret=SPOTIFY_CLIENT_SECRET
-)
-sp = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
+# === File per salvare gusti utenti ===
+DATA_FILE = "user_preferences.json"
 
-# --- GitHub interaction functions ---
-def github_get_file_sha():
-    url = f"https://api.github.com/repos/{REPO_GITHUB}/contents/{FILE_PATH_GITHUB}"
-    headers = {"Authorization": f"token {TOKEN_GITHUB}"}
-    r = requests.get(url, headers=headers)
-    if r.status_code == 200:
-        return r.json().get("sha")
-    return None
-
-def github_commit_file(content_json):
-    content_bytes = json.dumps(content_json, indent=2).encode("utf-8")
-    content_b64 = base64.b64encode(content_bytes).decode("utf-8")
-    sha = github_get_file_sha()
-
-    url = f"https://api.github.com/repos/{REPO_GITHUB}/contents/{FILE_PATH_GITHUB}"
-    headers = {
-        "Authorization": f"token {TOKEN_GITHUB}",
-        "Accept": "application/vnd.github+json"
-    }
-
-    payload = {
-        "message": "Aggiornamento artisti preferiti",
-        "content": content_b64,
-        "branch": BRANCH_GITHUB
-    }
-
-    if sha:
-        payload["sha"] = sha
-
-    response = requests.put(url, headers=headers, json=payload)
-    return response.status_code in [200, 201]
-
-# --- Gestione file utenti ---
-def load_user_artists():
-    if not os.path.exists("user_artists.json"):
-        return {}
-
-    with open("user_artists.json", "r") as f:
-        try:
+def load_data():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r") as f:
             return json.load(f)
-        except json.JSONDecodeError:
-            return {}
+    return {}
 
-
-def save_user_artists(data):
-    with open("user_artists.json", "w") as f:
+def save_data(data):
+    with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=2)
-    github_commit_file(data)
 
-
-
-
-
-
-
-
-# --- Comandi bot ---
+# === Bot Commands ===
 def start(update: Update, context: CallbackContext):
     msg = (
-        "🎵 Benvenuto! Ecco cosa puoi fare:\n\n"
-        "/search <brano> – Cerca una canzone su Spotify\n"
-        "/setartist <nome artista 1> <nome artista 2> – Aggiungi artisti ai tuoi preferiti\n"
-        "/listartists – Mostra i tuoi artisti preferiti\n"
-        "/recommend – Ottieni consigli basati sui tuoi gusti\n\n"
-        "Esempio: /setartist Dua Lipa Eminem\n"
-        "Esempio: /search Blinding Lights"
+        "👋 Benvenuto!\n\n"
+        "Usa questi comandi:\n"
+        "/set <titolo/artista> – Imposta i tuoi gusti\n"
+        "/recommend <tipo> – Ricevi consigli (music, movies, books)\n\n"
+        "Esempi:\n"
+        "/set Nirvana\n"
+        "/recommend music\n"
+        "/recommend movies"
     )
     update.message.reply_text(msg)
 
-def search_song(update: Update, context: CallbackContext):
-    query = " ".join(context.args)
+def set_preference(update: Update, context: CallbackContext):
+    user_id = str(update.effective_user.id)
+    query = " ".join(context.args).strip()
+
     if not query:
-        update.message.reply_text("❗ Usa /search seguito dal nome della canzone.")
-        return
-    results = sp.search(q=query, limit=1, type='track')
-    if results['tracks']['items']:
-        track = results['tracks']['items'][0]
-        update.message.reply_text(
-            f"🎶 {track['name']} - {track['artists'][0]['name']}\n{track['external_urls']['spotify']}"
-        )
-    else:
-        update.message.reply_text("❌ Nessuna canzone trovata.")
-
-def setartist(update: Update, context: CallbackContext):
-    user_id = str(update.effective_user.id)
-    artist_name = " ".join(context.args).strip()
-
-    if not artist_name:
-        update.message.reply_text("Devi scrivere il nome di un artista, es: /setartist Vasco Rossi")
+        update.message.reply_text("❗ Usa: /set <titolo/artista/film>")
         return
 
-    data = load_user_artists()
-    user_artists = data.get(user_id, [])
-
-    if artist_name not in user_artists:
-        user_artists.append(artist_name)
-        data[user_id] = user_artists
-        save_user_artists(data)
-        update.message.reply_text(f"Artista aggiunto: {artist_name}")
-    else:
-        update.message.reply_text(f"Hai già aggiunto {artist_name}")
-
-
-def listartists(update: Update, context: CallbackContext):
-    user_id = str(update.effective_user.id)
-    user_artists = load_user_artists()
-
-    if user_id not in user_artists or not user_artists[user_id]:
-        update.message.reply_text("📭 Non hai ancora artisti preferiti.")
-        return
-
-    artists = "\n".join(f"- {a}" for a in user_artists[user_id])
-    update.message.reply_text(f"🎨 I tuoi artisti:\n{artists}")
-
+    data = load_data()
+    data[user_id] = query
+    save_data(data)
+    update.message.reply_text(f"✅ Preferenza salvata: *{query}*", parse_mode="Markdown")
 
 def recommend(update: Update, context: CallbackContext):
     user_id = str(update.effective_user.id)
-    data = load_user_artists()
-    artists = data.get(user_id, [])
-    
-    if not artists:
-        update.message.reply_text("Non hai ancora aggiunto artisti preferiti. Usa /add_artist NomeArtista.")
+    content_type = " ".join(context.args).strip().lower()
+
+    if content_type not in ["music", "movies", "books"]:
+        update.message.reply_text("❗ Tipo non valido. Usa: music, movies o books\nEsempio: /recommend music")
         return
-    
+
+    data = load_data()
+    if user_id not in data:
+        update.message.reply_text("❗ Non hai ancora impostato gusti. Usa /set prima.")
+        return
+
+    user_query = data[user_id]
+
     try:
-        # Cerca gli artisti su Spotify per ottenere generi
-        genres = set()
-        for artist_name in artists:
-            result = sp.search(q=artist_name, type='artist', limit=1)
-            if result['artists']['items']:
-                genres.update(result['artists']['items'][0]['genres'])
-        
-        if not genres:
-            update.message.reply_text("Non ho trovato generi per i tuoi artisti preferiti.")
+        url = "https://tastedive.com/api/similar"
+        params = {
+            "q": user_query,
+            "type": content_type,
+            "limit": 5,
+            "info": 1,
+            "k": TASTEDIVE_API_KEY
+        }
+
+        response = requests.get(url, params=params)
+        result = response.json()
+
+        suggestions = result.get("Similar", {}).get("Results", [])
+        if not suggestions:
+            update.message.reply_text("⚠️ Nessun suggerimento trovato.")
             return
 
-        seed_genres = list(genres)[:2]  # Max 5 generi
-        recs = sp.recommendations(seed_genres=seed_genres, limit=5)
-        
-        messages = [f"🎧 {t['name']} di {t['artists'][0]['name']} - {t['external_urls']['spotify']}" for t in recs['tracks']]
-        update.message.reply_text("\n".join(messages))
+        message = f"🎯 *Suggerimenti per* _{user_query}_:\n\n"
+        for item in suggestions:
+            name = item.get("Name")
+            teaser = item.get("wTeaser", "")
+            link = item.get("wUrl", "")
+            message += f"🎬 *{name}*\n{teaser}\n🔗 {link}\n\n"
+
+        update.message.reply_text(message.strip(), parse_mode="Markdown", disable_web_page_preview=True)
 
     except Exception as e:
-        update.message.reply_text(f"Errore durante il recupero dei suggerimenti: {e}")
+        update.message.reply_text(f"Errore: {e}")
 
-
-
-# --- Avvio bot ---
+# === Avvio Bot ===
 def main():
     updater = Updater(TELEGRAM_TOKEN)
     dp = updater.dispatcher
+
     dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("search", search_song))
-    dp.add_handler(CommandHandler("setartist", setartist))
-    dp.add_handler(CommandHandler("listartists", listartists))
+    dp.add_handler(CommandHandler("set", set_preference))
     dp.add_handler(CommandHandler("recommend", recommend))
+
     updater.start_polling()
     updater.idle()
 

@@ -64,7 +64,8 @@ def start(update: Update, context: CallbackContext):
         "/recommend music\n"
         "/recommend movies"
     )
-    update.message.reply_text(msg)
+
+        update.message.reply_text(msg)
 
 def set_preference(update: Update, context: CallbackContext):
     user_id = str(update.effective_user.id)
@@ -77,7 +78,10 @@ def set_preference(update: Update, context: CallbackContext):
     data = load_data()
     data[user_id] = query
     save_data(data)
-    update.message.reply_text(f"✅ Preferenza salvata: *{query}*", parse_mode="Markdown")
+    update.message.reply_text(
+        f"✅ Preferenza salvata: *{escape_markdown_v2(query)}*",
+        parse_mode="MarkdownV2"
+    )
 
 
 def list_preferences(update: Update, context: CallbackContext):
@@ -160,7 +164,7 @@ def main():
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("set", set_preference))
     dp.add_handler(CommandHandler("recommend", recommend))
-
+    dp.add_handler(CommandHandler("list", list_preferences))
     updater.start_polling()
     updater.idle()
 

@@ -130,7 +130,7 @@ def recommend(update: Update, context: CallbackContext):
         print("Risposta JSON:", response.json())  # Debug contenuto
         result = response.json()
 
-        suggestions = result.get("Similar", {}).get("Results", [])
+        suggestions = result.get("similar", {}).get("results", [])
         if not suggestions:
             update.message.reply_text("⚠️ Nessun suggerimento trovato.")
             return

@@ -3,6 +3,8 @@ import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 import re
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CallbackQueryHandler
 import requests
 import base64
 from telegram import Update
@@ -46,10 +48,10 @@ def save_data(data):
 
 
 def escape_markdown_v2(text: str) -> str:
-    """
-    Escape dei caratteri speciali per Telegram MarkdownV2.
-    """
+    if not isinstance(text, str):
+        text = str(text) if text is not None else ""
     return re.sub(r'([_*\[\]()~`>#+\-=|{}.!\\])', r'\\\1', text)
+
 
 # === Bot Commands ===
 def start(update: Update, context: CallbackContext):
@@ -58,7 +60,8 @@ def start(update: Update, context: CallbackContext):
         "Usa questi comandi:\n"
         "/set <titolo/artista> – Imposta i tuoi gusti\n"
         "/list  vedi i tuoi artisti preferiti \n"
-        "/remove <titolo/artista> \n"
+        "/remove <titolo/artista> rimuovi 1 preferenza\n"
+         "/clear pulisci tutte le preferenze \n"
         "/recommend <tipo> – Ricevi consigli (music, movies, books)\n\n"
         "Esempi:\n"
         "/set Nirvana\n"
@@ -91,6 +94,40 @@ def set_preference(update: Update, context: CallbackContext):
         parse_mode="MarkdownV2"
     )
 
+
+def clear_preferences(update: Update, context: CallbackContext):
+    keyboard = [
+        [InlineKeyboardButton("✅ Conferma eliminazione", callback_data="confirm_clear")],
+        [InlineKeyboardButton("❌ Annulla", callback_data="cancel_clear")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text("⚠️ Sei sicuro di voler eliminare **tutte** le preferenze?", 
+                              reply_markup=reply_markup, parse_mode="MarkdownV2")
+
+
+
+
+
+
+def button_handler(update: Update, context: CallbackContext):
+    query = update.callback_query
+    user_id = str(query.from_user.id)
+    query.answer()
+
+    data = load_data()
+
+    if query.data == "confirm_clear":
+        if user_id in data:
+            data[user_id] = []
+            save_data(data)
+            query.edit_message_text("🗑️ Tutte le preferenze sono state eliminate.")
+        else:
+            query.edit_message_text("ℹ️ Nessuna preferenza da eliminare.")
+    elif query.data == "cancel_clear":
+        query.edit_message_text("❎ Operazione annullata.")
+
+
+
 def list_preferences(update: Update, context: CallbackContext):
     user_id = str(update.effective_user.id)
     data = load_data()
@@ -103,28 +140,10 @@ def list_preferences(update: Update, context: CallbackContext):
     message = "🎨 *Le tue preferenze attuali:*\n\n"
     message += "\n".join(f"- {escape_markdown_v2(p)}" for p in prefs)
 
-    update.message.reply_text(message, parse_mode="MarkdownV2")
-
-def remove_preference(update: Update, context: CallbackContext):
-    user_id = str(update.effective_user.id)
-    query = " ".join(context.args).strip()
-
-    if not query:
-        update.message.reply_text("❗ Usa: /remove <titolo/artista/film>")
-        return
-
-    data = load_data()
-
-    if user_id not in data or query not in data[user_id]:
-        update.message.reply_text("⚠️ Preferenza non trovata.")
-        return
-
-    data[user_id].remove(query)
-    save_data(data)
-    update.message.reply_text(
-        f"🗑️ Preferenza rimossa: *{escape_markdown_v2(query)}*",
-        parse_mode="MarkdownV2"
-    )
+    try:
+        update.message.reply_text(message, parse_mode="MarkdownV2")
+    except Exception as e:
+        update.message.reply_text(f"Errore nella visualizzazione delle preferenze:\n{str(e)}")
 
 
 
@@ -189,6 +208,8 @@ def main():
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("set", set_preference))
     dp.add_handler(CommandHandler("recommend", recommend))
+    dp.add_handler(CommandHandler("clear", clear_preferences))
+    dp.add_handler(CallbackQueryHandler(button_handler))
     dp.add_handler(CommandHandler("list", list_preferences))
     dp.add_handler(CommandHandler("remove", remove_preference))
     updater.start_polling()

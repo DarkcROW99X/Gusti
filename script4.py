@@ -94,6 +94,8 @@ def recommend(update: Update, context: CallbackContext):
         }
 
         response = requests.get(url, params=params)
+        print("TasteDive URL:", response.url)  # Debug URL
+        print("Risposta JSON:", response.json())  # Debug contenuto
         result = response.json()
 
         suggestions = result.get("Similar", {}).get("Results", [])

@@ -45,12 +45,11 @@ def save_data(data):
         json.dump(data, f, indent=2)
 
 
-def escape_markdown(text: str) -> str:
+def escape_markdown_v2(text: str) -> str:
     """
-    Escape characters for Telegram MarkdownV2.
+    Escape dei caratteri speciali per Telegram MarkdownV2.
     """
-    escape_chars = r'_*[]()~`>#+-=|{}.!'
-    return re.sub(f"([{re.escape(escape_chars)}])", r"\\\1", text)
+    return re.sub(r'([_*\[\]()~`>#+\-=|{}.!\\])', r'\\\1', text)
 
 # === Bot Commands ===
 def start(update: Update, context: CallbackContext):
@@ -134,18 +133,17 @@ def recommend(update: Update, context: CallbackContext):
             update.message.reply_text("⚠️ Nessun suggerimento trovato.")
             return
 
-        message = f"🎯 *Suggerimenti per* _{escape_markdown(user_query)}_:\n\n"
+        message = f"🎯 *Suggerimenti per* _{escape_markdown_v2(user_query)}_:\n\n"
         for item in suggestions:
-            name = escape_markdown(item.get("name", ""))
-            teaser = escape_markdown(item.get("description") or "Nessuna descrizione disponibile.")
-            link = item.get("wUrl", "")
+            name = escape_markdown_v2(item.get("name", ""))
+            teaser = escape_markdown_v2(item.get("description") or "Nessuna descrizione disponibile.")
+            link = escape_markdown_v2(item.get("wUrl", ""))
             message += f"🎬 *{name}*\n{teaser}\n🔗 {link}\n\n"
 
         update.message.reply_text(message.strip(), parse_mode="MarkdownV2", disable_web_page_preview=True)
 
     except Exception as e:
-        update.message.reply_text(f"Errore: {e}")
-
+        update.message.reply_text(f"Errore: {escape_markdown_v2(str(e))}", parse_mode="MarkdownV2")
 
 
 

@@ -27,6 +27,8 @@ load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TASTEDIVE_API_KEY = os.getenv("TASTEDIVE_API_KEY")
+print("TasteDive API key:", TASTEDIVE_API_KEY)
+
 
 # === File per salvare gusti utenti ===
 DATA_FILE = "user_preferences.json"
@@ -67,6 +69,36 @@ def set_preference(update: Update, context: CallbackContext):
     data[user_id] = query
     save_data(data)
     update.message.reply_text(f"✅ Preferenza salvata: *{query}*", parse_mode="Markdown")
+
+
+def list_preferences(update: Update, context: CallbackContext):
+    user_id = str(update.effective_user.id)
+    data = load_data()
+    
+    if user_id not in data or not data[user_id]:
+        update.message.reply_text("📭 Non hai ancora aggiunto preferenze. Usa /set per aggiungerne una.")
+        return
+    
+    pref = data[user_id]
+    # Se salvi un singolo valore stringa (come nel codice sopra)
+    # usa semplicemente:
+    update.message.reply_text(f"🎨 Le tue preferenze attuali sono:\n- {pref}")
+
+    # Se invece vuoi gestire lista di preferenze, cambia la struttura dati e qui usa:
+    # prefs = data[user_id]
+    # messaggio = "\n".join(f"- {p}" for p in prefs)
+    # update.message.reply_text(f"🎨 Le tue preferenze:\n{messaggio}")
+
+
+
+
+
+
+
+
+
+
+
 
 def recommend(update: Update, context: CallbackContext):
     user_id = str(update.effective_user.id)

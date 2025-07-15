@@ -98,8 +98,6 @@ def list_preferences(update: Update, context: CallbackContext):
 
 
 
-
-
 def recommend(update: Update, context: CallbackContext):
     user_id = str(update.effective_user.id)
     content_type = " ".join(context.args).strip().lower()
@@ -126,8 +124,6 @@ def recommend(update: Update, context: CallbackContext):
         }
 
         response = requests.get(url, params=params)
-        print("TasteDive URL:", response.url)  # Debug URL
-        print("Risposta JSON:", response.json())  # Debug contenuto
         result = response.json()
 
         suggestions = result.get("similar", {}).get("results", [])
@@ -137,8 +133,8 @@ def recommend(update: Update, context: CallbackContext):
 
         message = f"🎯 *Suggerimenti per* _{user_query}_:\n\n"
         for item in suggestions:
-            name = item.get("Name")
-            teaser = item.get("wTeaser", "")
+            name = item.get("name")
+            teaser = item.get("description") or "Nessuna descrizione disponibile."
             link = item.get("wUrl", "")
             message += f"🎬 *{name}*\n{teaser}\n🔗 {link}\n\n"
 
@@ -146,6 +142,7 @@ def recommend(update: Update, context: CallbackContext):
 
     except Exception as e:
         update.message.reply_text(f"Errore: {e}")
+
 
 # === Avvio Bot ===
 def main():

@@ -2,6 +2,7 @@ import threading
 import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
+import re
 import requests
 import base64
 from telegram import Update
@@ -43,12 +44,21 @@ def save_data(data):
     with open(DATA_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
+
+def escape_markdown(text: str) -> str:
+    """
+    Escape characters for Telegram MarkdownV2.
+    """
+    escape_chars = r'_*[]()~`>#+-=|{}.!'
+    return re.sub(f"([{re.escape(escape_chars)}])", r"\\\1", text)
+
 # === Bot Commands ===
 def start(update: Update, context: CallbackContext):
     msg = (
         "👋 Benvenuto!\n\n"
         "Usa questi comandi:\n"
         "/set <titolo/artista> – Imposta i tuoi gusti\n"
+        "/list  vedi i tuoi artisti preferiti \n"
         "/recommend <tipo> – Ricevi consigli (music, movies, books)\n\n"
         "Esempi:\n"
         "/set Nirvana\n"
@@ -91,13 +101,6 @@ def list_preferences(update: Update, context: CallbackContext):
 
 
 
-
-
-
-
-
-
-
 def recommend(update: Update, context: CallbackContext):
     user_id = str(update.effective_user.id)
     content_type = " ".join(context.args).strip().lower()
@@ -131,17 +134,24 @@ def recommend(update: Update, context: CallbackContext):
             update.message.reply_text("⚠️ Nessun suggerimento trovato.")
             return
 
-        message = f"🎯 *Suggerimenti per* _{user_query}_:\n\n"
+        message = f"🎯 *Suggerimenti per* _{escape_markdown(user_query)}_:\n\n"
         for item in suggestions:
-            name = item.get("name")
-            teaser = item.get("description") or "Nessuna descrizione disponibile."
+            name = escape_markdown(item.get("name", ""))
+            teaser = escape_markdown(item.get("description") or "Nessuna descrizione disponibile.")
             link = item.get("wUrl", "")
             message += f"🎬 *{name}*\n{teaser}\n🔗 {link}\n\n"
 
-        update.message.reply_text(message.strip(), parse_mode="Markdown", disable_web_page_preview=True)
+        update.message.reply_text(message.strip(), parse_mode="MarkdownV2", disable_web_page_preview=True)
 
     except Exception as e:
         update.message.reply_text(f"Errore: {e}")
+
+
+
+
+
+
+
 
 
 # === Avvio Bot ===

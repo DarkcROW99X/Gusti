@@ -138,7 +138,8 @@ def list_preferences(update: Update, context: CallbackContext):
 
     prefs = data[user_id]
     message = "🎨 *Le tue preferenze attuali:*\n\n"
-    message += "\n".join(f"- {escape_markdown_v2(p)}" for p in prefs)
+    message += "\n".join(f"🎵 {escape_markdown_v2(p)}" for p in prefs)
+
 
     try:
         update.message.reply_text(message, parse_mode="MarkdownV2")
